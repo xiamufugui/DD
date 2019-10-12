@@ -1,0 +1,58 @@
+# -*-coding=utf8-*-
+import requests
+import json,urllib2
+import logging
+from apscheduler.schedulers.blocking import BlockingScheduler
+from elasticsearch import Elasticsearch
+url = "https://oapi.dingtalk.com/robot/send?access_token=e0c6b4c154a162a6359a28bd43b9e57b10b3dbb5c977dafc01651468cb8b9331"
+header = {
+"Content-Type": "application/json",
+"charset": "utf-8"
+}
+#hosts = [{"host": "HOSTIP", "port": 9200},]
+#es = Elasticsearch(hosts=hosts)
+
+last_timestamp = 0
+def get_log():
+    res = requests.get('http://IP/piwik/index.php?date=today&expanded=1&filter_limit=10&format=JSON&idSite=3&method=Live.getLastVisitsDetails&module=API&period=day&token_auth=4bab585b7acab9900abc08a46d2e2e5b')
+    log_list = json.loads(res.content)
+    global last_timestamp
+    for cur_log in log_list:
+        if cur_log.has_key('serverTimestamp') and cur_log['serverTimestamp'] > last_timestamp:
+            last_timestamp = cur_log['serverTimestamp']
+
+            #cur_log =json.dumps(cur_log,encoding="UTF-8", ensure_ascii=False).replace("\\n","").replace("\"","")
+            #cur_log = json.dumps(cur_log, encoding="UTF-8", ensure_ascii=False).replace("\\n", "")
+            #cur_log = json.loads(cur_log)
+            print  cur_log[u'actionDetails']
+            dict={"visitIp":cur_log[u'visitIp'],"actionDetails":cur_log[u'actionDetails']}
+            dict=json.dumps(dict, encoding="UTF-8", ensure_ascii=False).replace("\\n", "").replace("\"","")
+
+            #cur_log =json.loads(cur_log)
+            #cur_log =cur_log['visitIp']
+            print cur_log
+            data = {
+                "msgtype": "text",
+                "text": {
+                    "content": dict
+                }
+
+            }
+            sendData = json.dumps(data)
+            request = urllib2.Request(url, data=sendData, headers=header)
+            urlopen = urllib2.urlopen(request)
+            print urlopen.read()
+            #es.index(index='news', doc_type='politics', body=cur_log)
+
+if __name__ == '__main__':
+    log = logging.getLogger('apscheduler.executors.default')
+    log.setLevel(logging.INFO)  # DEBUG
+
+    fmt = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
+    h = logging.StreamHandler()
+    h.setFormatter(fmt)
+    log.addHandler(h)
+
+    scheduler = BlockingScheduler()
+    scheduler.add_job(get_log, 'interval', seconds=3)
+    scheduler.start()
